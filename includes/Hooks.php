@@ -4,10 +4,9 @@ namespace MediaWiki\Extension\UBCAuth;
 
 use Exception;
 use DatabaseUpdater;
-use PluggableAuthLogin;
-use MediaWiki\Auth\AuthManager;
+use MediaWiki\Extension\PluggableAuth\PluggableAuthLogin;
+use MediaWiki\MediaWikiServices;
 use MediaWiki\Extension\LDAPProvider\ClientFactory;
-use MediaWiki\Extension\LDAPAuthentication2\ExtraLoginFields;
 use MediaWiki\Extension\LDAPProvider\LDAPNoDomainConfigException as NoDomain;
 
 class Hooks {
@@ -61,7 +60,7 @@ class Hooks {
             $wiki_username = $row->user_name;
             $existing_user_found = true;
         }
-        $dbr->freeResult( $res );
+        $res->free();
 
         if ( $existing_user_found ) {
             return $wiki_username;
@@ -85,7 +84,7 @@ class Hooks {
         $cwl_data['ubcAffiliation'] = $ubcAffiliation;
         $cwl_data['full_name'] = $real_name;
         $cwl_data['wiki_username'] = $wiki_username;
-        $authManager = AuthManager::singleton();
+        $authManager = MediaWikiServices::getInstance()->getAuthManager();
         $authManager->setAuthenticationSessionData(
             static::CWL_DATA_SESSION_KEY,
             $cwl_data
@@ -110,7 +109,7 @@ class Hooks {
         $dbw = wfGetDB( DB_MASTER );
         $table = $wgDBprefix."user_cwl_extended_account_data";
 
-        $authManager = AuthManager::singleton();
+        $authManager = MediaWikiServices::getInstance()->getAuthManager();
         $cwl_data = $authManager->getAuthenticationSessionData(
             static::CWL_DATA_SESSION_KEY
         );
@@ -151,19 +150,16 @@ class Hooks {
     }
 
     private static function _ldap_retrieve_info( $ldapUserName ) {
-        $authManager = AuthManager::singleton();
-        $extraLoginFields = $authManager->getAuthenticationSessionData(
-            PluggableAuthLogin::EXTRALOGINFIELDS_SESSION_KEY
-        );
-        $domain = $extraLoginFields[ExtraLoginFields::DOMAIN];
+        global $ubcLDAPDomain;
+        $domain = $ubcLDAPDomain;
 
         $ldapClient = null;
         $ldapInfo = [];
         try {
             $ldapClient = ClientFactory::getInstance()->getForDomain( $domain );
         } catch ( NoDomain $e ) {
-            wfDebugLog( 'error', 'LDAP doamin unavailable: '.$domain );
-            throw new Exception( 'LDAP doamin unavailable' );
+            wfDebugLog( 'error', 'LDAP domain unavailable: '.$domain );
+            throw new Exception( 'LDAP domain unavailable' );
         }
 
         // get user info from LDAP
@@ -220,7 +216,7 @@ class Hooks {
         foreach ( $res as $row ) {
             $found = true;
         }
-        $dbr->freeResult( $res );
+        $res->free();
         return $found;
     }
 
