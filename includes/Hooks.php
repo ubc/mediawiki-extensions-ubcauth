@@ -86,9 +86,6 @@ class Hooks {
         $cwl_employee_number = static::_employeenumber_from_ldap( $ldapInfo );
         $cwl_edu_person_entitlement = static::_edupersonentitlement_from_ldap( $ldapInfo );
 
-        ##TEST
-        $cwl_student_number = '8888888888';
-        
         $ubcAffiliation = $cwl_edu_person_entitlement ? $cwl_edu_person_entitlement : ($cwl_employee_number ? $cwl_employee_number:($cwl_student_number ? $cwl_student_number:''));
         
         $cwl_data = [];
