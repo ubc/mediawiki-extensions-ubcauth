@@ -5,12 +5,16 @@ namespace MediaWiki\Extension\UBCAuth;
 use Exception;
 use DatabaseUpdater;
 use MediaWiki\Extension\PluggableAuth\PluggableAuthLogin;
-use MediaWiki\MediaWikiServices;
 use MediaWiki\Extension\LDAPProvider\ClientFactory;
 use MediaWiki\Extension\LDAPProvider\LDAPNoDomainConfigException as NoDomain;
+use MediaWiki\Logger\LoggerFactory;
+use MediaWiki\MediaWikiServices;
+use User;
 
 class Hooks {
     const CWL_DATA_SESSION_KEY = "CWL_DATA";
+    const LOGGER_UBC_AUTH = 'UBCAuth Extension';
+    const SYSTEM_USER_UBC_AUTH = 'UBCAuth Extension';
 
     public static function onLoadExtensionSchemaUpdates( DatabaseUpdater $updater ) {
         $updater->addExtensionTable( 'user_cwl_extended_account_data', dirname( __DIR__ ) . '/sql/add_table.sql' );
@@ -24,6 +28,7 @@ class Hooks {
      */
     public static function onLocalUserCreated( $user, $autocreated ) {
         if ( $autocreated ) {
+            static::_block_user_if_basic_cwl($user);
             if ( !static::_create_cwl_extended_account_data( $user ) ) {
                 throw new Exception('Failed to create CWL extended data record');
             }
@@ -101,6 +106,49 @@ class Hooks {
         );
 
         return $wiki_username;
+    }
+
+    /**
+     * _block_user_if_basic_cwl - spam bots only have basic CWL, so we're going
+     * to start off every basic CWL user as blocked. Real users can contact the
+     * wiki team to get unblocked on a case-by-case basis. Basic CWL users don't
+     * have puid.
+     *
+     * Mediawiki doesn't really support deleting users, hence why we're blocking
+     * them instead.
+     *
+     * @param User $user
+     */
+    private static function _block_user_if_basic_cwl($user) {
+        $authManager = MediaWikiServices::getInstance()->getAuthManager();
+        $cwl_data = $authManager->getAuthenticationSessionData(
+            static::CWL_DATA_SESSION_KEY
+        );
+        if ($cwl_data['puid']) return; 
+        # a missing puid indicates a basic cwl user, we want to block the
+        # account permanently. Note that by default, 'autoblocking' is enabled
+        # which also temporarily blocks the user's IP address for 24 hours.
+		$blockUserFactory = MediaWikiServices::getInstance()->getBlockUserFactory();
+        $performer = User::newSystemUser( static::SYSTEM_USER_UBC_AUTH,
+            [ 'steal' => true ] ); # steal means disable account for normal use
+        $res = $blockUserFactory->newBlockUser(
+            $user,
+            $performer,
+            'infinity',
+            'UBC Wiki no longer allows the use of a Basic CWL account for security reasons. Please contact the LT Hub for assistance.',
+            [
+                'isCreateAccountBlocked' => true,
+                'isEmailBlocked' => true, # can't use Special:EmailUser
+                'isUserTalkEditBlocked' => true, # can't edit their own user page
+                'isAutoblocking' => true, # ban ip for 1 day
+                'isHardBlock' => true, # ban ip again if they try to login later
+            ]
+        )->placeBlockUnsafe(); # unsafe just means no need to check permissions
+        $log = static::_get_log();
+        if (!$res->isOK()) {
+            $log->error("Failed to block Basic CWL User: " . $user->getName());
+            $log->error($res->getMessage()->text());
+        }
     }
 
     /**
@@ -271,6 +319,11 @@ class Hooks {
             $username = $username_base.$num;
         }
         return $username;
+    }
+
+    // get the logging instance for this extension
+    private static function _get_log() {
+        return LoggerFactory::getInstance( static::LOGGER_UBC_AUTH );
     }
 }
 
