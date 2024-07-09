@@ -1,6 +1,6 @@
 {
     "name": "UBC Auth",
-    "version": "0.0.2",
+    "version": "0.1.0",
     "author": [
         "Pan Luo"
     ],
@@ -18,7 +18,6 @@
     "ExtensionMessagesFiles": {
     },
     "Hooks": {
-        "SetupAfterCache": "MediaWiki\\Extension\\UBCAuth\\Hooks::onSetupAfterCache",
         "LoadExtensionSchemaUpdates": "MediaWiki\\Extension\\UBCAuth\\Hooks::onLoadExtensionSchemaUpdates",
         "LocalUserCreated": "MediaWiki\\Extension\\UBCAuth\\Hooks::onLocalUserCreated"
     },
@@ -31,10 +30,9 @@
     "SpecialPages": {
     },
     "requires": {
-		"MediaWiki": ">= 1.31.0",
+		"MediaWiki": ">= 1.39.0",
         "extensions": {
-            "LDAPProvider": "*",
-            "LDAPAuthentication2": "*"
+            "SimpleSAMLphp": ">= 7.0"
         }
 	},
     "manifest_version": 2
