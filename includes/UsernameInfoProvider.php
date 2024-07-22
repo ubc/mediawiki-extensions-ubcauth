@@ -16,26 +16,21 @@ class UsernameInfoProvider extends Username {
     public function getValue($attrs, $conf): string {
         $this->attrs = $attrs;
         $this->conf = $conf;
+        $wiki_username = '';
 
         # we expect usernameAttribute to be configured as the CWL login name key
         $cwlLogin = $this->getStringAttr('usernameAttribute', true);
         # see if this CWL login already has an existing account
-        # TODO: getConnectionProvider() is only available after REL1.42
-        #$dbr = MediaWikiServices::getInstance()->getConnectionProvider()->getReplicaDatabase();
-        $dbr = MediaWikiServices::getInstance()->getDBLoadBalancer()->getConnection(DB_REPLICA);
-        $row = $dbr->newSelectQueryBuilder()
-                   ->select( [ 'u.user_name', 'ucead.CWLLogin' ] )
-                   ->from( 'user_cwl_extended_account_data', 'ucead' )
-                   ->join( 'user', 'u', 'ucead.user_id=u.user_id' )
-                   ->where( [ 'ucead.CWLLogin' => $cwlLogin ] )
-                   ->caller( __METHOD__ )->fetchRow();
-        if ($row) {
+        $ucead = Hooks::getUceadByCwlLogin($cwlLogin);
+        if ($ucead) {
             # return existing user
-            return $row->user_name;
+            $wiki_username = $ucead->user_name;
+        }
+        else {
+            # no existing user, so we have to generate a username
+            $wiki_username = $this->getNewWikiUsername();
         }
 
-        # no existing user, so we have to generate a username
-        $wiki_username = $this->getNewWikiUsername();
 
         # Store relevant attributes so we can save them to the CWL extended
         # account data table later (in Hooks.php) when the user is actually

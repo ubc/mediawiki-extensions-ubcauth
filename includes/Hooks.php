@@ -32,9 +32,34 @@ class Hooks {
         }
     }
 
+    public static function onUserLoggedIn( $user ) {
+        if ( !static::_update_cwl_extended_account_data( $user ) ) {
+            throw new Exception('Failed to update CWL extended data record');
+        }
+    }
+
     ///////////////////////////////////////////////////////////////////////////
     // helper functions
     ///////////////////////////////////////////////////////////////////////////
+    
+    /**
+     * Get the user extended CWL data for the given user's cwl login name.
+     * Returns the database row if found, false otherwise.
+     */
+    public static function getUceadByCwlLogin( string $cwlLogin ) {
+        # TODO: getConnectionProvider() is only available after REL1.42
+        #$dbr = MediaWikiServices::getInstance()->getConnectionProvider()->getReplicaDatabase();
+        $dbr = MediaWikiServices::getInstance()->getDBLoadBalancer()->getConnection(DB_REPLICA);
+        # note, CWLRole/puid/CWLNickname fields are needed for checking if we
+        # need to update extended cwl data
+        $row = $dbr->newSelectQueryBuilder()
+                   ->select( [ 'u.user_name', 'ucead.CWLLogin', 'ucead.CWLRole', 'ucead.puid', 'ucead.CWLNickname' ] )
+                   ->from( 'user_cwl_extended_account_data', 'ucead' )
+                   ->join( 'user', 'u', 'ucead.user_id=u.user_id' )
+                   ->where( [ 'ucead.CWLLogin' => $cwlLogin ] )
+                   ->caller( __METHOD__ )->fetchRow();
+        return $row;
+    }
 
     /**
      * _block_user_if_basic_cwl - spam bots only have basic CWL, so we're going
@@ -92,43 +117,26 @@ class Hooks {
         $dbw = wfGetDB( DB_MASTER );
         $table = $wgDBprefix."user_cwl_extended_account_data";
 
-        $authManager = MediaWikiServices::getInstance()->getAuthManager();
-        $cwl_data = $authManager->getAuthenticationSessionData(
-            static::CWL_DATA_SESSION_KEY
-        );
-        if ( empty( $cwl_data ) ) {
-            throw new Exception( 'UBCAUth - Unable to create CWL extended account data' );
-            return true;
-        }
+        $cwl_data = static::_get_cwl_data();
+
         if ( $cwl_data['wiki_username'] != $user->getName() ) {
             throw new Exception( 'Problem linking new user with CWL account' );
         }
-
-        $user_id = $user->getId();
-        $puid = $cwl_data['puid'];
-        $cwl_login_name = $cwl_data['cwl_login_name'];
-        $ubcAffiliation = $cwl_data['ubcAffiliation'];
-        $full_name = $cwl_data['full_name'];
-        $authManager->removeAuthenticationSessionData(
-            static::CWL_DATA_SESSION_KEY
-        );
-
-        static::_block_user_if_basic_cwl($user, $ubcAffiliation);
-        # existing data shows users with multiple affiliations stores them as a
-        # space delimited string, so we'll follow that behaviour
-        $ubcAffiliation = implode(' ', $ubcAffiliation);
-
-        $full_name = preg_replace( "/[^A-Za-z0-9 ]/", '', $full_name );
+        #$log = static::_get_log();
+        #$log->debug("---------------");
+        #$log->debug(print_r($cwl_data, true));
+        #$log->debug("---------------");
+        static::_block_user_if_basic_cwl($user, $cwl_data['ubcAffiliation']);
 
         $insert_a = array(
-            'user_id' => $user_id,
-            'puid'    => $puid,
+            'user_id' => $user->getId(),
+            'puid'    => $cwl_data['puid'],
             'ubc_role_id' => '',  // no longer captured doing SSO
             'ubc_dept_id' => '', // no longer captured doing SSO
             'wgDBprefix' => $wgDBprefix,
-            'CWLLogin' => $cwl_login_name,
-            'CWLRole' => $ubcAffiliation,   // TODO: check if this field is used
-            'CWLNickname' => $full_name,
+            'CWLLogin' => $cwl_data['cwl_login_name'],
+            'CWLRole' => $cwl_data['ubcAffiliation'],
+            'CWLNickname' => $cwl_data['full_name'],
             //'CWLSaltedID' => $CWLSaltedID, // no longer needed using PUID
             'account_status' => 1   //might never be used.
         );
@@ -136,6 +144,67 @@ class Hooks {
         # TODO: use new db API InsertQueryBuilder when we upgrade >= REL1.41
         $res_ad = $dbw->insert( $table, $insert_a );
         return $res_ad;
+    }
+    
+    /**
+     * Update CWL extended account data, we have a lot of users with empty
+     * fields due to our LDAP attributes being restricted at some point,
+     * hopefully this will fill them in gradually.
+     */
+    private static function _update_cwl_extended_account_data( $user ) {
+        #$log = static::_get_log();
+        #$log->debug("Start Update CWL Extended Accoutn Data");
+        global $wgDBprefix;
+
+        # TODO: wfGetDB() deprecated in 1.39, use MediaWikiServices::getInstance()->getConnectionProvider()->getPrimaryDatabase() in 1.42
+        $dbw = wfGetDB( DB_MASTER );
+        $table = $wgDBprefix."user_cwl_extended_account_data";
+
+        $cwl_data = static::_get_cwl_data();
+        $ucead = static::getUceadByCwlLogin($cwl_data['cwl_login_name']);
+
+        if ($ucead->puid == $cwl_data['puid'] &&
+            $ucead->CWLRole == $cwl_data['ubcAffiliation'] &&
+            $ucead->CWLNickname == $cwl_data['full_name']) {
+            #$log->debug("No Changes");
+            // no changes
+            return true;
+        }
+
+        $updates = array(
+            'puid'    => $cwl_data['puid'],
+            'CWLRole' => $cwl_data['ubcAffiliation'],
+            'CWLNickname' => $cwl_data['full_name'],
+        );
+
+        # TODO: use new db API InsertQueryBuilder when we upgrade >= REL1.41
+        $res_ad = $dbw->update(
+            $table,
+            $updates,
+            ['CWLLogin' => $cwl_data['cwl_login_name']]
+        );
+        #$log->debug("Updated with new changes");
+        return $res_ad;
+    }
+
+    private static function _get_cwl_data(): array {
+        $authManager = MediaWikiServices::getInstance()->getAuthManager();
+        $cwl_data = $authManager->getAuthenticationSessionData(
+            static::CWL_DATA_SESSION_KEY
+        );
+        $authManager->removeAuthenticationSessionData(
+            static::CWL_DATA_SESSION_KEY
+        );
+        if ( empty( $cwl_data ) ) {
+            throw new Exception( 'UBCAUth - Unable to get CWL attribute data' );
+        }
+        # existing data shows users with multiple affiliations stores them as a
+        # space delimited string, so we'll follow that behaviour
+        $cwl_data['ubcAffiliation'] = implode(' ', $cwl_data['ubcAffiliation']);
+        # TODO: not sure this name sanitization is necessary anymore, keeping
+        # it for now to avoid potential issues, but should test later
+        $cwl_data['full_name'] = preg_replace( "/[^A-Za-z0-9 ]/", '', $cwl_data['full_name']);
+        return $cwl_data;
     }
 
     // get the logging instance for this extension
