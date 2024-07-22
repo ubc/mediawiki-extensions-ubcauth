@@ -119,6 +119,9 @@ class Hooks {
 
         $cwl_data = static::_get_cwl_data();
 
+        if ( empty( $cwl_data ) ) {
+            throw new Exception( 'UBCAUth - Unable to get CWL attribute data' );
+        }
         if ( $cwl_data['wiki_username'] != $user->getName() ) {
             throw new Exception( 'Problem linking new user with CWL account' );
         }
@@ -161,6 +164,11 @@ class Hooks {
         $table = $wgDBprefix."user_cwl_extended_account_data";
 
         $cwl_data = static::_get_cwl_data();
+        if (!$cwl_data) {
+            # no saved cwl data, probably a newly created user which already
+            # retrieved the data
+            return true;
+        }
         $ucead = static::getUceadByCwlLogin($cwl_data['cwl_login_name']);
 
         if ($ucead->puid == $cwl_data['puid'] &&
@@ -196,7 +204,7 @@ class Hooks {
             static::CWL_DATA_SESSION_KEY
         );
         if ( empty( $cwl_data ) ) {
-            throw new Exception( 'UBCAUth - Unable to get CWL attribute data' );
+            return [];
         }
         # existing data shows users with multiple affiliations stores them as a
         # space delimited string, so we'll follow that behaviour
