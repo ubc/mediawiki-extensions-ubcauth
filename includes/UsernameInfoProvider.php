@@ -21,7 +21,7 @@ class UsernameInfoProvider extends Username {
         # we expect usernameAttribute to be configured as the CWL login name key
         $cwlLogin = $this->getStringAttr('usernameAttribute', true);
         # see if this CWL login already has an existing account
-        $ucead = Hooks::getUceadByCwlLogin($cwlLogin);
+        $ucead = Hooks::_get_ucead_by_cwl($cwlLogin);
         if ($ucead) {
             # return existing user
             $wiki_username = $ucead->user_name;

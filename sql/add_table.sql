@@ -1,15 +1,17 @@
+-- Note that Mediawiki has a war on VARCHAR as they don't want to deal with
+-- collation issues, we're using VARBINARY cause that's what Mediawiki converts
+-- VARCHAR to anyway
 CREATE TABLE IF NOT EXISTS /*_*/user_cwl_extended_account_data
 (
- ucad_id        int auto_increment                  primary key,
- user_id        int                                 not null,
- puid           varchar(50)                         not null,
- ubc_role_id    int                                 not null,
- ubc_dept_id    int                                 not null,
- CWLLogin       varchar(50)                         not null,
- CWLNickname    varchar(150)                        not null,
- CWLRole        varchar(120)                        not null,
- CWLSaltedID    varchar(200)                        not null,
- wgDBprefix     varchar(150)                        not null,
- date_created   timestamp default CURRENT_TIMESTAMP not null,
- account_status varchar(10)                         not null
+ ucad_id        int                auto_increment primary key,
+ user_id        int                not null,
+ puid           varbinary(255)     not null,
+ CWLLogin       varbinary(255)     not null,
+ CWLNickname    varbinary(1000)     not null,
+ CWLRole        varbinary(255)     not null,
+ CWLRolePast    varbinary(1000)     not null default '' comment 'Lets us know this person used to be affiliated with UBC even if their current CWLRole is empty. the autoblocker will skip accounts with a past role.',
+ wgDBprefix     varbinary(150)     not null,
+ date_created   timestamp          not null default CURRENT_TIMESTAMP,
+ date_updated   DATETIME           on update CURRENT_TIMESTAMP,
+ account_status varbinary(255)     not null
 ) /*$wgDBTableOptions*/;

@@ -20,7 +20,8 @@
     "Hooks": {
         "LoadExtensionSchemaUpdates": "MediaWiki\\Extension\\UBCAuth\\Hooks::onLoadExtensionSchemaUpdates",
         "LocalUserCreated": "MediaWiki\\Extension\\UBCAuth\\Hooks::onLocalUserCreated",
-        "UserLoggedIn": "MediaWiki\\Extension\\UBCAuth\\Hooks::onUserLoggedIn"
+        "UserLoggedIn": "MediaWiki\\Extension\\UBCAuth\\Hooks::onUserLoggedIn",
+        "UnblockUserComplete": "MediaWiki\\Extension\\UBCAuth\\Hooks::onUnblockUserComplete"
     },
     "MessagesDirs": {
     },
