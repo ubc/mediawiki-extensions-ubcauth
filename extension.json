@@ -24,6 +24,9 @@
         "UnblockUserComplete": "MediaWiki\\Extension\\UBCAuth\\Hooks::onUnblockUserComplete"
     },
     "MessagesDirs": {
+      "UBCAuth": [
+        "i18n"
+      ]
     },
     "ResourceModules": {
     },

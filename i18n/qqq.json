@@ -1,0 +1,3 @@
+{
+  "ubcauth-basiccwl-block-reason": "Describes the reason why basic CWL users are autoblocked on login. Plain text only, does not handle html/wikitext."
+}

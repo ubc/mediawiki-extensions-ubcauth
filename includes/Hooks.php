@@ -122,7 +122,7 @@ class Hooks {
             $user,
             $performer,
             'infinity',
-            'UBC Wiki no longer allows the use of a Basic CWL account for security reasons. Please contact the LT Hub for assistance.',
+            wfMessage( 'ubcauth-basiccwl-block-reason')->text(),
             [
                 'isCreateAccountBlocked' => true,
                 'isEmailBlocked' => true, # can't use Special:EmailUser
