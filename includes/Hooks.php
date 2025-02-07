@@ -54,7 +54,9 @@ class Hooks {
 
         $updates = ['CWLRolePast' => $pastRoleUpdate];
         global $wgDBprefix;
-        $dbw = wfGetDB( DB_MASTER );
+        $dbProvider = MediaWikiServices::getInstance()->getConnectionProvider();
+        $dbw = $dbProvider->getPrimaryDatabase();
+
         $table = $wgDBprefix."user_cwl_extended_account_data";
         $res_ad = $dbw->update(
             $table,
@@ -151,8 +153,8 @@ class Hooks {
     private static function _create_cwl_extended_account_data( $user ) {
         global $wgDBprefix;
 
-        # TODO: wfGetDB() deprecated in 1.39, use MediaWikiServices::getInstance()->getConnectionProvider()->getPrimaryDatabase() in 1.42
-        $dbw = wfGetDB( DB_MASTER );
+        $dbProvider = MediaWikiServices::getInstance()->getConnectionProvider();
+        $dbw = $dbProvider->getPrimaryDatabase();
         $table = $wgDBprefix."user_cwl_extended_account_data";
 
         $cwl_data = static::_get_cwl_data();
@@ -223,9 +225,9 @@ class Hooks {
         );
 
         # TODO: use new db API InsertQueryBuilder when we upgrade >= REL1.41
-        # TODO: wfGetDB() deprecated in 1.39, use MediaWikiServices::getInstance()->getConnectionProvider()->getPrimaryDatabase() in 1.42
         global $wgDBprefix;
-        $dbw = wfGetDB( DB_MASTER );
+        $dbProvider = MediaWikiServices::getInstance()->getConnectionProvider();
+        $dbw = $dbProvider->getPrimaryDatabase();
         $table = $wgDBprefix."user_cwl_extended_account_data";
         $res_ad = $dbw->update(
             $table,
@@ -250,7 +252,7 @@ class Hooks {
         $pastRoleArr = explode(' ', $pastRole);
         $newRoleArr = explode(' ', $newRole);
         $rolesArr = array_unique(
-            array_merge($curRoleArr, $pastRoleArr, $newRoleArr)); 
+            array_merge($curRoleArr, $pastRoleArr, $newRoleArr));
         return implode(' ', $rolesArr);
     }
 
