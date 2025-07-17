@@ -86,8 +86,10 @@ class UsernameInfoProvider extends Username {
     }
 
     private function isExistingUser( $username ) {
-        $userId = User::idFromName($username);
-        if ($userId) return true;
+        $user = MediaWikiServices::getInstance()
+                                 ->getUserIdentityLookup()
+                                 ->getUserIdentityByName($username);
+        if ($user && $user->getId()) return true;
         return false;
     }
 
